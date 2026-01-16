@@ -322,6 +322,66 @@ children:
           鼠标悬停显示下拉菜单。
         scenarios: []
 
+  # ------------------------------------------
+  # REQ-2-7: 登录注册数据库落地
+  # ------------------------------------------
+  - id: REQ-2-7
+    name: 登录注册数据库落地
+    functional_description: |
+      登录与注册接口接入 PostgreSQL 数据库，使用 SQLAlchemy 读写用户表。
+      注册时将用户信息写入 users 表，密码以哈希形式存储，禁止明文保存。
+      注册需保证 username 与 id_number 全局唯一，冲突时返回业务错误码与提示信息。
+      登录时按用户名查询数据库，校验密码哈希，失败时返回统一错误结构和提示。
+      登录验证码接口仅做参数校验与模拟发送，后续可扩展为真实短信网关。
+    ui_description: |
+      表单交互与样式保持不变，通过错误提示文案反馈后端校验结果。
+      登录成功后更新前端用户状态并跳转到个人中心或首页。
+    scenarios:
+      - name: 数据库持久化注册成功
+        steps:
+          - action: 填写完整注册信息并提交
+          - expectation: 后端写入 users 表，对应记录可在数据库中查询到，接口返回 code=0。
+      - name: 用户名或证件号重复
+        steps:
+          - action: 使用已存在的用户名或证件号再次注册
+          - expectation: 接口返回非0业务码和错误提示，前端在表单上展示。
+      - name: 数据库校验登录
+        steps:
+          - action: 使用已注册账户与正确密码登录
+          - expectation: 后端从数据库验证通过，返回成功结果，前端进入已登录状态。
+      - name: 密码错误登录失败
+        steps:
+          - action: 使用已注册账户但输入错误密码登录
+          - expectation: 后端返回登录失败业务码和提示，不进入已登录状态。
+
+  # ------------------------------------------
+  # REQ-2-8: 个人信息数据库落地与登录态联动
+  # ------------------------------------------
+  - id: REQ-2-8
+    name: 个人信息数据库落地与登录态联动
+    functional_description: |
+      个人信息页面的展示与编辑基于 PostgreSQL 中的 users 表，而非内存中的 demo 数据。
+      用户登录成功后，后端登录接口返回携带用户名信息的 Token，前端持久化并在后续请求中作为 Authorization 头携带。
+      “获取个人信息”和“更新个人信息”接口根据 Token 中携带的用户名定位当前用户记录，保证展示与登录账号一致。
+      支持更新姓名(real_name)、联系方式(phone、email) 以及优惠类型(user_type)，修改后写回数据库并保证幂等。
+    ui_description: |
+      前端 ProfilePage.vue 继续采用原有布局与交互，仅数据来源改为真实数据库。
+      页面进入时通过 Axios 调用 /api/users/profile 接口加载当前登录用户信息并填充 Pinia 的 userStore.profile。
+      点击“编辑”与“编辑联系方式”按钮后，提交更新请求至 /api/users/profile，成功后刷新并保持最新信息。
+    scenarios:
+      - name: 登录后加载当前用户信息
+        steps:
+          - action: 使用新注册账户登录系统并进入个人中心
+          - expectation: 个人信息页面展示的用户名、证件号、联系方式与数据库中该用户记录一致，而非固定 demo_user。
+      - name: 修改姓名后刷新页面仍然生效
+        steps:
+          - action: 在“基本信息”模块中修改姓名并点击“保存”，刷新页面或重新进入个人中心
+          - expectation: 后端已更新 users 表，对应记录 real_name 字段变更，页面再次加载时显示新姓名。
+      - name: 修改联系方式持久化
+        steps:
+          - action: 在“联系方式”模块中修改手机号或邮箱并保存
+          - expectation: 对应 phone、email 字段写入数据库，接口返回最新数据，前端状态与数据库保持一致。
+
 api_endpoints:
   - method: POST
     path: /auth/login

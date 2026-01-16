@@ -53,6 +53,26 @@
 | 代码检查 | ESLint | ^8.x |
 | 代码格式化 | Prettier | ^3.x |
 
+#### 2.1.1 开发环境 Vite 代理配置
+
+- 前端所有接口请求统一通过 Axios 实例，`baseURL` 固定为 `/api`。
+- 开发环境必须在 `frontend/vite.config.js` 中配置 `server.proxy`，将 `/api` 前缀转发到本地 FastAPI 后端。
+- 默认约定后端运行在 `http://localhost:8000`，因此代理配置为：
+
+  ```js
+  server: {
+    port: 5173,
+    proxy: {
+      "/api": {
+        target: "http://localhost:8000",
+        changeOrigin: true,
+      },
+    },
+  }
+  ```
+
+- 通过该代理，前端代码中始终使用相对路径 `/api/...` 访问接口，无需关心后端实际端口和跨域问题。
+
 ### 2.2 后端 (Backend)
 
 | 类别 | 技术选型 | 版本要求 |
@@ -73,7 +93,96 @@
 | 文件上传 | python-multipart | ^0.0.x |
 | 邮箱验证 | email-validator | ^2.2.x |
 
----
+
+#### 2.2.1 本地 PostgreSQL 初始化（方法一：新建用户 + 数据库）
+
+本项目后端默认使用如下连接字符串：
+
+```text
+postgresql+psycopg2://user:password@localhost:5432/railway12306
+```
+
+本地开发环境需要先准备对应的数据库和账号（仅需一次）：
+
+1. 安装 PostgreSQL（推荐 14/15 版本），保持默认端口 5432。
+2. 使用超级用户（例如 postgres）登录 psql：
+
+   ```bash
+   psql -U postgres
+   ```
+
+3. 在 psql 中依次执行以下 SQL，新建用户和数据库：
+
+   ```sql
+   -- 创建登录用户 user，密码为 password
+   CREATE USER "user" WITH PASSWORD 'password';
+
+   -- 创建数据库 railway12306，并设置 owner 为 user
+   CREATE DATABASE railway12306 OWNER "user";
+
+   -- 授权（owner 一般已具备全部权限，此语句用于显式说明）
+   GRANT ALL PRIVILEGES ON DATABASE railway12306 TO "user";
+   ```
+
+4. 验证连接是否成功：
+
+   ```bash
+   psql -U user -d railway12306
+   ```
+
+   若能看到 `railway12306=>` 提示符，说明数据库连通正常。
+
+5. Python 端确认连通性（在 backend 目录的虚拟环境中）：
+
+   ```bash
+   python
+   ```
+
+   ```python
+   from app.db.session import engine
+
+   with engine.connect() as conn:
+       result = conn.execute("SELECT 1")
+       print(list(result))  # 期望输出 [(1,)]
+   ```
+
+> 若希望使用自定义数据库名/用户/密码，可修改 `backend/app/db/session.py` 中的 `SQLALCHEMY_DATABASE_URL`，但必须同时在 PostgreSQL 中创建对应的账号和数据库。
+
+#### 2.2.2 数据库表结构初始化（init_db.py）
+
+在确认 PostgreSQL 可用且连接字符串正确后，可通过项目内置脚本初始化数据库表结构。目前模型仅包含 `users` 表，将随着模型的扩展自动同步。
+
+1. 确保在 backend 虚拟环境中已安装数据库驱动：
+
+   ```bash
+   pip install psycopg2-binary
+   ```
+
+2. 在 backend 目录下运行初始化脚本：
+
+   ```bash
+   cd backend
+   python -m app.db.init_db
+   ```
+
+3. 该脚本会导入 SQLAlchemy 基类与用户模型，并执行：
+
+   ```python
+   Base.metadata.create_all(bind=engine)
+   ```
+
+   从而在当前配置的数据库中创建所有已定义的表（例如 `users`）。
+
+4. 可在 psql 中通过 `\dt` 命令确认表是否已创建：
+
+   ```bash
+   psql -U user -d railway12306
+   \dt
+   ```
+
+后续如新增模型（例如订单、车次等），只要保证它们被导入到 `app.models`，再次运行 `python -m app.db.init_db` 即可完成表结构更新（对于已有表字段变更仍建议通过 Alembic 迁移管理）。
+
+
 
 ## 3. 项目目录结构规范 (Directory Structure)
 
