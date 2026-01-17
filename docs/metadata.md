@@ -111,10 +111,21 @@ postgresql+psycopg2://user:password@localhost:5432/railway12306
    psql -U postgres
    ```
 
-3. 在 psql 中依次执行以下 SQL，新建用户和数据库：
+3. 在 psql 中先检查是否已存在目标数据库，再按需新建用户和数据库：
+
+   1）列出当前数据库，确认是否已经有 `railway12306`：
 
    ```sql
-   -- 创建登录用户 user，密码为 password
+   \l
+   -- 或使用查询方式（大小写敏感时注意引号）：
+   SELECT datname FROM pg_database WHERE datname = 'railway12306';
+   ```
+
+   若已经存在，则可以跳过“创建数据库”这一步，仅检查是否已有合适的用户和权限。  
+   若不存在，再执行下面的 SQL 新建用户和数据库：
+
+   ```sql
+   -- 创建登录用户 user，密码为 password（如已存在会报错，可忽略或手动调整）
    CREATE USER "user" WITH PASSWORD 'password';
 
    -- 创建数据库 railway12306，并设置 owner 为 user
@@ -197,8 +208,18 @@ postgresql+psycopg2://user:password@localhost:5432/railway12306
 │   └── ...
 │
 ├── docs/                              # 文档目录
-│   ├── requirement.md                 # 需求文档
-│   └── metadata.md                    # 本元数据文档
+│   ├── requirement.md                 # 需求文档总览（聚合各模块需求）
+│   ├── metadata.md                    # 本元数据文档（技术与结构唯一真理源）
+│   ├── requirements/                  # 按模块拆分的需求文档
+│   │   ├── 1.车票查询与展示.yaml
+│   │   ├── 2.用户认证与个人中心.yaml
+│   │   ├── 3.订单系统.yaml
+│   │   └── 4.乘客管理.yaml
+│   └── api/                           # API 契约文档（按 REQ 分组）
+│       ├── req-1-车票查询与展示-api.md
+│       ├── req-2-用户认证与个人中心-api.md
+│       ├── req-3-订单系统-api.md
+│       └── req-4-乘客管理-api.md
 │
 ├── backend/                           # 后端 FastAPI 项目
 │   ├── .env                           # 环境变量（不入库）
@@ -416,7 +437,26 @@ postgresql+psycopg2://user:password@localhost:5432/railway12306
 - **API 前缀**: `/api`
 - **当前版本**: v1（隐式，可扩展为显式版本 `/api/v1`）
 
-### 4.2 API 路由映射表
+### 4.2 API 契约文档（docs/api）
+
+- 所有关键业务模块的 API 契约按 REQ 维度拆分存放于 `docs/api/` 目录，例如：
+  - `docs/api/req-1-车票查询与展示-api.md`
+  - `docs/api/req-2-用户认证与个人中心-api.md`
+  - `docs/api/req-3-订单系统-api.md`
+  - `docs/api/req-4-乘客管理-api.md`
+- 契约文档以需求编号为主索引，描述：
+  - 每个 REQ 对应的 API 列表（Method + Path）
+  - 请求/响应模型（字段名、类型、枚举）
+  - 契约状态（是否已落地到现有后端实现）
+- 当以下角色涉及 API 设计或实现时，必须在修改代码前优先查阅对应 REQ 的 API 契约文档：
+  - 接口/骨架设计智能体（Interface Designer）
+  - TDD 实现智能体（TDD Developer）
+  - 任何改动现有 endpoint 的人类或智能体
+- 如契约文档与后端实际实现存在不一致：
+  - 以最新的需求文档和经确认的业务决定为准；
+  - 同步更新 `docs/api/*.md` 与后端代码，禁止只改一侧。
+
+### 4.3 API 路由映射表
 
 | 路由前缀 | 端点文件 | 功能描述 |
 |----------|----------|----------|
@@ -431,7 +471,7 @@ postgresql+psycopg2://user:password@localhost:5432/railway12306
 | `/api/user-roles` | user_roles.py | 用户角色分配 |
 | `/api/password-recovery/*` | password_recovery.py | 找回密码流程 |
 
-### 4.3 响应格式规范
+### 4.4 响应格式规范
 
 所有 API 响应必须遵循以下统一格式：
 
@@ -452,7 +492,7 @@ postgresql+psycopg2://user:password@localhost:5432/railway12306
 }
 ```
 
-### 4.4 HTTP 状态码规范
+### 4.5 HTTP 状态码规范
 | 状态码 | 含义 |
 |--------|------|
 | 200 | 请求成功 |
@@ -686,6 +726,31 @@ proxy: {
 - ❌ 不得使用 MySQL/SQLite 替代 PostgreSQL
 - ❌ 不得使用 Vuex 替代 Pinia
 - ❌ 不得使用 Element Plus 替代 Ant Design Vue
+
+---
+
+## 14. 12306 官方站点-项目路由映射表
+
+本节用于对齐 Railway 项目页面路由与 12306 官网实际 URL。第三列“12306 官方站点参考 URL（待填写）”由人工从官网填写。
+
+| 项目路由路径 | 关联需求编号 | 12306 官方站点参考 URL（待填写） | 页面组件 | 访问权限 |
+|--------------|--------------|----------------------------------|----------|----------|
+| `/` | REQ-1 |`https://www.12306.cn/index/index.html`| HomePage.vue | 公开 |
+| `/login` | REQ-2-1 |`https://kyfw.12306.cn/otn/resources/login.html`| LoginPage.vue | 公开 |
+| `/register` | REQ-2-2 |`https://kyfw.12306.cn/otn/regist/init`| RegisterPage.vue | 公开 |
+| `/forgot-password` | REQ-2-3 | `https://kyfw.12306.cn/otn/view/find_my_password.html` | ForgotPasswordPage.vue | 公开 |
+| `/verify-code` | REQ-2-3 |`https://kyfw.12306.cn/otn/view/find_my_password.html`| VerifyCodePage.vue | 公开 |
+| `/new-password` | REQ-2-3 |`https://kyfw.12306.cn/otn/view/find_my_password.html`| NewPasswordPage.vue | 公开 |
+| `/leftTicket/single` | REQ-1-1 |`https://kyfw.12306.cn/otn/leftTicket/init?linktypeid=dc`| LeftTicketSingle.vue | 公开 |
+| `/leftTicket/round` | REQ-1-1 |`https://kyfw.12306.cn/otn/leftTicket/init?linktypeid=wf`| LeftTicketRound.vue | 公开 |
+| `/order/create` | REQ-3-1 |`https://kyfw.12306.cn/otn/confirmPassenger/initWc?N`| OrderCreate.vue | 需登录 |
+| `/order/confirm` | REQ-3-1 |需要实际购票，请参考截图资源| OrderConfirm.vue | 需登录 |
+| `/order/:orderId` | REQ-3-2 |需要实际购票，请参考截图资源| OrderDetail.vue | 需登录 |
+| `/order/success` | REQ-3-3 |需要实际购票，请参考截图资源| OrderSuccess.vue | 需登录 |
+| `/user` | REQ-2-4 |`https://kyfw.12306.cn/otn/view/index.html`| UserLayout.vue / UserWelcomePage.vue | 需登录 |
+| `/user/profile` | REQ-2-4, REQ-2-8 |`https://kyfw.12306.cn/otn/view/information.html`| ProfilePage.vue | 需登录 |
+| `/user/passengers` | REQ-4-1, REQ-4-2 |`https://kyfw.12306.cn/otn/view/passengers.html`| PassengerPage.vue | 需登录 |
+| `/user/orders` | REQ-3-6 |`https://kyfw.12306.cn/otn/view/train_order.html`| OrderPage.vue | 需登录 |
 
 ---
 

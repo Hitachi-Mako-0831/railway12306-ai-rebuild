@@ -4,7 +4,8 @@
 
 ## 0. 总目标
 
-- 从 `docs/requirements/*.yaml` 与 `docs/metadata.md`（如存在）中读取需求与场景。
+- 从 `docs/requirements/*.yaml`、`docs/api/*.md` 与元数据系统中读取需求与场景：
+  - 必须通过 `architect-manager` 提供的工具按需读取元数据，而不是一次性整篇加载 `docs/metadata.md`。
 - 在不“偷实现”的前提下创建/调整项目骨架，使得：
   - 前后端路由、API 调用层、主要页面与组件的结构存在；
   - 后端 API endpoint 的路径、请求/响应 schema、错误码规范确定；
@@ -20,6 +21,22 @@
 - 优先编辑已有文件，其次才创建新文件；除非确有必要，否则不创建新文件。
 - 除非用户明确要求，不要新增 README/说明性 Markdown；你只能产出本次指定的工程骨架变更（以及必要的代码文件）。
 - 保持仓库现有代码风格与目录结构；不要引入仓库未使用的框架/库。
+- 当你需要遵守 metadata 中的某类约束时，必须在修改代码之前调用元数据章节工具：
+  - 使用 `mcp_architect-manager_get_metadata_section(project_root=<PROJECT_ROOT>, section_key=<KEY>)` 按需读取对应章节；
+  - section_key 需要与 `docs/metadata_index.yaml` 中的 `sections` 对应，例如：
+    - 技术栈相关 → `tech_stack`
+    - 目录结构/文件位置 → `directory_structure`
+    - API 路由/响应格式 → `api_spec`
+    - 数据库模型与枚举 → `db_model`
+    - 前端路由与权限 → `frontend_routes`
+    - 认证与 RBAC → `auth_rbac`
+    - 表单/验证规则 → `validation`
+    - 状态管理 → `state_management`
+    - 代码规范 → `code_style`
+    - 运行/部署 → `run_deploy`
+    - 测试规范 → `testing`
+    - 其他注意事项 → `notes`。
+- 严禁在未阅读对应 metadata 章节的情况下，凭记忆或猜测编写与上述约束相关的代码；一旦发生冲突，以最新的 metadata 章节内容为唯一真理来源。
 
 ## 2. 输入与输出
 
@@ -58,6 +75,7 @@
   - 创建/补全 `src/api/*.js` 中的 API 方法签名（仅 request 封装调用，不处理业务）
   - 创建/补全 router 路由入口，使页面可被导航到
   - 如项目已有类型文件/常量文件，补全枚举与字段名（避免后续各人各写一套）
+  - 对于已有模块（如 REQ-1～REQ-4），在定义 API client 函数签名前，应优先查阅 `docs/api/` 中对应 REQ 的 API 契约文档，确保 method、path、字段名与契约一致；如需变更契约，应同步更新契约文档并在说明中标注变更原因。
 - 后端（仅骨架）：
   - 在 `app/api/v1/endpoints/` 中创建/补全 endpoint 文件与路由注册
   - 在 `app/schemas/` 中创建/补全请求/响应模型（字段名与类型必须与前端契约一致）

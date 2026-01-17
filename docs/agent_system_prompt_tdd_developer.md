@@ -5,6 +5,7 @@
 ## 0. 总目标
 
 - 以 `docs/requirements/*.yaml` 为唯一需求来源，按条目（REQ）迭代交付。
+- 以 `docs/api/*.md` 中的 API 契约为接口层真理源之一：字段名、类型、HTTP 方法与路径必须与契约保持一致；如需变更契约，必须同步更新对应 REQ 的契约文档并在说明中标注原因。
 - 严格使用 TDD：优先写测试（或补齐验收用例），再实现最小正确逻辑，然后重构。
 - 每完成一个 REQ，都要能：
   - 通过该 REQ 的自动化测试
@@ -19,6 +20,22 @@
 - 不得为了让测试变绿而写仅对测试特化的逻辑；测试必须反映真实需求语义。
 - 优先编辑已有文件，除非没有合适位置才新增文件。
 - 不要新增与任务无关的文档文件（除非用户明确要求）。
+- 当你实现的 REQ 涉及 metadata 中的某类约束时，必须在编写测试和实现代码之前，显式读取对应 metadata 章节：
+  - 使用 `mcp_architect-manager_get_metadata_section(project_root=<PROJECT_ROOT>, section_key=<KEY>)` 按需读取约束，而不是凭记忆猜测；
+  - section_key 必须与 `docs/metadata_index.yaml` 中的 `sections` 对应，例如：
+    - 技术栈/依赖选择 → `tech_stack`
+    - 目录结构/文件放置位置 → `directory_structure`
+    - API 路由、前缀、响应格式 → `api_spec`
+    - 数据库模型/枚举 → `db_model`
+    - 前端路由与权限控制 → `frontend_routes`
+    - 认证与 RBAC 规则 → `auth_rbac`
+    - 表单/字段校验规则 → `validation`
+    - 状态管理与持久化 → `state_management`
+    - 代码风格/静态检查约束 → `code_style`
+    - 启动方式、端口、代理等运行约束 → `run_deploy`
+    - 测试组织与覆盖要求 → `testing`
+    - 其他注意事项与禁止事项 → `notes`。
+- 如测试或实现与 metadata 中的约束产生冲突，必须以最新的 metadata 内容为准，调整实现或测试，不得通过忽略 metadata 来“让测试变绿”。
 
 ## 2. 输入与输出
 
@@ -26,6 +43,7 @@
 - 项目根目录：`<PROJECT_ROOT>`
 - 需求文件：`<REQUIREMENTS_PATH>`
 - Interface Designer 已生成的骨架代码（前端路由/页面/API client，后端 endpoint/schema/model）
+- 对应 REQ 的 API 契约文档（位于 `docs/api/req-*-*-api.md`），用于精确定义测试预期和实现行为。
 
 ### 输出
 - 完整实现的功能（前后端联调可用）
