@@ -1,0 +1,34 @@
+metadata_file: "docs/metadata.md"
+
+api_prefix: "/api"
+
+backend:
+  root: "backend/app"
+  endpoints_dir: "backend/app/api/v1/endpoints"
+
+frontend:
+  root: "frontend/src"
+  components_dir: "frontend/src/components"
+  views_dir: "frontend/src/views"
+
+constraints:
+  allowed_frontend_ext:
+    - ".vue"
+    - ".js"
+  allowed_backend_ext:
+    - ".py"
+
+sections:
+  overview: "1. 项目概述 (Project Overview)"
+  tech_stack: "2. 技术栈约束 (Tech Stack Constraints)"
+  directory_structure: "3. 项目目录结构规范 (Directory Structure)"
+  api_spec: "4. API 接口规范 (API Specification)"
+  db_model: "5. 数据库模型规范 (Database Model)"
+  frontend_routes: "6. 前端路由规范 (Frontend Routes)"
+  auth_rbac: "7. 认证与权限规范 (Auth & RBAC)"
+  validation: "8. 表单验证规范 (Validation Rules)"
+  state_management: "9. 状态管理规范 (State Management)"
+  code_style: "10. 代码规范 (Code Style)"
+  run_deploy: "11. 运行与部署约束 (Run & Deploy)"
+  testing: "12. 测试规范 (Testing)"
+  notes: "13. 注意事项 (Notes)"

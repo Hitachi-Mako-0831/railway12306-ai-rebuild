@@ -130,7 +130,7 @@
 ### API Specification
 
 - **Method**: `POST`
-- **Endpoint**: `/api/auth/logout`
+- **Endpoint**: `/api/v1/logout`
 - **Summary**: 退出登录 (Logout)
 - **Response Model**: `Response`
 
