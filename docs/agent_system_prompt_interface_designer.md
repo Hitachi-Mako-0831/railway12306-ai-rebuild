@@ -54,8 +54,14 @@
 
 ### Step A：初始化设计队列
 1. 选择一个需求文件作为当前设计目标（例如：`docs/requirements/1.车票查询与展示.yaml`）。
-2. 调用：
+2. 每次开始工作时，先调用：
    - `mcp_architect-manager_init_top_down_queue(project_root=<PROJECT_ROOT>, requirements_path=<REQUIREMENTS_PATH>)`
+   - 该工具会自动检查 `artifacts/phase_one_meta.yaml` 中记录的需求文件路径：
+     - 如与当前 `<REQUIREMENTS_PATH>` 相同，则复用已有队列与 artifacts；
+     - 如不相同，则自动清空旧的 Phase 1 队列和设计 artifacts（包括 `ui_interface.yaml`、`api_interface.yaml`、`func_interface.yaml`），并基于当前需求文件重新初始化。
+3. 如果你需要在同一份需求文件上“从头再来”，可以显式调用：
+   - `mcp_architect-manager_reset_top_down_queue(project_root=<PROJECT_ROOT>, requirements_path=<REQUIREMENTS_PATH>)`
+   - 该工具会强制删除与 Phase 1 相关的进度和设计 artifacts，并基于当前需求文件重新生成队列。
 
 ### Step B：逐条读取需求并产出“契约”
 循环执行直到需求耗尽：
@@ -113,9 +119,9 @@
 - “接口字段命名随意变化”：禁止；字段必须来自需求契约
 - “把真实业务逻辑写进骨架”：禁止；只给函数签名与返回结构
 
-## 5. 交付格式（向用户汇报时）
+## 5. 向用户汇报时的输出格式
 
-- 列出新增/修改的关键文件列表（前端/后端/测试分别一组）
-- 列出本次固定的 API 列表（method + path）
-- 列出本次固定的核心数据结构（关键字段）
-- 列出你登记的 UI/API/Backend Function 的 ID 清单
+- 每次回复必须控制在 1～2 句中文内，不得输出长篇列表。
+- 第一句：用一句话概括本轮完成的需求或骨架变更（包含关键 REQ ID 或模块名）。
+- 第二句：用一句话说明下一步计划要处理的需求或模块。
+- 不再罗列文件清单、API 列表或详细数据结构，这些信息仅写入代码仓库和 artifacts 供其他智能体自动读取。

@@ -383,10 +383,11 @@ function popNextRequirement(projectRoot, progressFileName, reqDocPath) {
   }
 
   return {
+    status: 'success',
     progress: `${taskIndex + 1}/${progressList.length}`,
     requirement: finalRequirement,
     parent: parentInfo,
-    images: loadedImages // <--- 新增字段
+    images: loadedImages
   };
 }
 
@@ -455,30 +456,25 @@ function registerInterfaceItem(projectRoot, fileName, itemId, newItemData, merge
 // --- 图片提取逻辑 ---
 
 function extractImages(baseDir, text) {
-  if (!text || typeof text !== 'string') return {};
-  
+  if (!text || typeof text !== "string") return {};
+
   const images = {};
-  // 匹配 Markdown 链接格式 [xxx](path) 或图片格式 ![xxx](path)
-  // 捕获组 1 是路径
   const regex = /(?:!\[.*?\]|\[.*?\])\((.*?)\)/g;
   let match;
 
   while ((match = regex.exec(text)) !== null) {
     const relativePath = match[1];
-    
-    // 简单的扩展名过滤，确保只读取图片
+
     if (!/\.(png|jpg|jpeg|gif|bmp|webp|svg)$/i.test(relativePath)) {
       continue;
     }
 
     try {
-      // 解析绝对路径：基于需求文档所在的目录
       const absPath = path.resolve(baseDir, relativePath);
-      
+
       if (fs.existsSync(absPath)) {
         const fileBuffer = fs.readFileSync(absPath);
-        // 转为 Base64
-        images[relativePath] = fileBuffer.toString('base64');
+        images[relativePath] = fileBuffer.toString("base64");
       } else {
         console.warn(`[Warning] Image file not found: ${absPath}`);
       }
@@ -489,6 +485,25 @@ function extractImages(baseDir, text) {
   return images;
 }
 
+function safeUnlink(filePath) {
+  try {
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+  } catch (e) {
+    console.error(`[Warning] Failed to delete file ${filePath}: ${e.message}`);
+  }
+}
+
+function getPhaseOnePaths(projectRoot) {
+  const artifactsDir = path.join(projectRoot, "artifacts");
+  const progressPath = path.join(artifactsDir, "phase_one_progress.yaml");
+  const metaPath = path.join(artifactsDir, "phase_one_meta.yaml");
+  const uiPath = path.join(artifactsDir, "ui_interface.yaml");
+  const apiPath = path.join(artifactsDir, "api_interface.yaml");
+  const funcPath = path.join(artifactsDir, "func_interface.yaml");
+  return { artifactsDir, progressPath, metaPath, uiPath, apiPath, funcPath };
+}
 
 // --- Tool Definitions ---
 
@@ -507,18 +522,124 @@ server.tool(
     const { project_root, requirements_path } = args;
 
     try {
-      const outputPath = path.join(project_root, 'artifacts', 'phase_one_progress.yaml');
-      if (fs.existsSync(outputPath)) {
-        return { content: [{ type: "text", text: `Phase 1 is already initialized. Progress file exists at: ${outputPath}` }] };
+      const { artifactsDir, progressPath, metaPath, uiPath, apiPath, funcPath } = getPhaseOnePaths(project_root);
+      if (!fs.existsSync(artifactsDir)) {
+        fs.mkdirSync(artifactsDir, { recursive: true });
       }
+
+      const requestedAbs = path.resolve(project_root, requirements_path);
+
+      if (fs.existsSync(progressPath)) {
+        let matched = false;
+        if (fs.existsSync(metaPath)) {
+          const meta = loadYaml(metaPath);
+          if (meta && typeof meta === "object") {
+            const storedAbs =
+              meta.requirements_abs_path ||
+              (meta.requirements_path ? path.resolve(project_root, meta.requirements_path) : null);
+            if (storedAbs && storedAbs === requestedAbs) {
+              matched = true;
+            }
+          }
+        }
+
+        if (matched) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: `Phase 1 is already initialized for requirements file: ${requirements_path}`,
+              },
+            ],
+          };
+        }
+
+        safeUnlink(progressPath);
+        safeUnlink(metaPath);
+        safeUnlink(uiPath);
+        safeUnlink(apiPath);
+        safeUnlink(funcPath);
+      }
+
       const rawReqs = loadYaml(requirements_path);
-      if (!rawReqs) return { content: [{ type: "text", text: `Failed to load requirements file.` }] };
+      if (!rawReqs) {
+        return { content: [{ type: "text", text: "Failed to load requirements file." }] };
+      }
 
-      const queue = []; // Phase 1 初始化空队列或根据特定逻辑初始化
+      const queue = [];
       flattenPreOrder(rawReqs, queue);
-      saveYaml(outputPath, queue);
+      saveYaml(progressPath, queue);
+      saveYaml(metaPath, {
+        requirements_path,
+        requirements_abs_path: requestedAbs,
+        created_at: new Date().toISOString(),
+      });
 
-      return { content: [{ type: "text", text: `Initialized Phase 1 queue with ${queue.length} items.` }] };
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Initialized Phase 1 queue with ${queue.length} items for requirements file: ${requirements_path}`,
+          },
+        ],
+      };
+    } catch (err) {
+      return { content: [{ type: "text", text: `Error: ${err.message}` }] };
+    }
+  }
+);
+
+server.tool(
+  "reset_top_down_queue",
+  "Reinitialize Phase 1 (Design) queue and clear related artifacts. [REQUIRED: project_root, requirements_path].",
+  {
+    project_root: z.string().describe("MANDATORY. Project root path."),
+    requirements_path: z.string().describe("MANDATORY. Requirements file path."),
+  },
+  async (args) => {
+    console.error("[Debug] reset_top_down_queue args:", JSON.stringify(args));
+    const validationError = validateInputs(args);
+    if (validationError) {
+      return { content: [{ type: "text", text: validationError }] };
+    }
+    const { project_root, requirements_path } = args;
+
+    try {
+      const { artifactsDir, progressPath, metaPath, uiPath, apiPath, funcPath } = getPhaseOnePaths(project_root);
+      if (!fs.existsSync(artifactsDir)) {
+        fs.mkdirSync(artifactsDir, { recursive: true });
+      }
+
+      safeUnlink(progressPath);
+      safeUnlink(metaPath);
+      safeUnlink(uiPath);
+      safeUnlink(apiPath);
+      safeUnlink(funcPath);
+
+      const rawReqs = loadYaml(requirements_path);
+      if (!rawReqs) {
+        return { content: [{ type: "text", text: "Failed to load requirements file." }] };
+      }
+
+      const queue = [];
+      flattenPreOrder(rawReqs, queue);
+      saveYaml(progressPath, queue);
+      const requestedAbs = path.resolve(project_root, requirements_path);
+      saveYaml(metaPath, {
+        requirements_path,
+        requirements_abs_path: requestedAbs,
+        created_at: new Date().toISOString(),
+        reset: true,
+      });
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Reset Phase 1 queue with ${queue.length} items for requirements file: ${requirements_path}`,
+          },
+        ],
+      };
     } catch (err) {
       return { content: [{ type: "text", text: `Error: ${err.message}` }] };
     }
