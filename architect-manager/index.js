@@ -177,6 +177,43 @@ function collectRequirementInterfaces(projectRoot, reqId) {
   return result;
 }
 
+function loadPhaseOneRequirements(projectRoot) {
+  const { metaPath } = getPhaseOnePaths(projectRoot);
+  if (!fs.existsSync(metaPath)) return null;
+  const meta = loadYaml(metaPath);
+  if (!meta || !meta.requirements_path) return null;
+  const reqDocPath = path.isAbsolute(meta.requirements_path)
+    ? meta.requirements_path
+    : path.join(projectRoot, meta.requirements_path);
+  const rawReqs = loadYaml(reqDocPath);
+  if (!rawReqs) return null;
+  return { rawReqs, reqDocPath };
+}
+
+function extractImagePathsFromText(text) {
+  if (!text || typeof text !== "string") return [];
+  const result = new Set();
+  const regex = /([^\s)]+?\.(png|jpg|jpeg|gif|bmp|webp|svg))/gi;
+  let match;
+  while ((match = regex.exec(text)) !== null) {
+    result.add(match[1]);
+  }
+  return Array.from(result);
+}
+
+function collectUiImagePathsForReq(projectRoot, reqId) {
+  const state = loadPhaseOneRequirements(projectRoot);
+  if (!state) return [];
+  const { rawReqs } = state;
+  const node = findRequirementById(rawReqs, reqId);
+  if (!node) return [];
+  const result = new Set();
+  if (node.ui_description) {
+    extractImagePathsFromText(node.ui_description).forEach(p => result.add(p));
+  }
+  return Array.from(result);
+}
+
 function resolveProjectPath(projectRoot, filePath) {
   if (!filePath) return null;
   if (path.isAbsolute(filePath)) return filePath;
@@ -696,8 +733,12 @@ server.tool(
       if (!check.ok) {
         return { content: [{ type: "text", text: `ValidationError: ${check.message}` }] };
       }
-      // 1. 注册到 ui_interface.yaml
-      registerInterfaceItem(project_root, 'ui_interface.yaml', id, { related_req_id, ...data }, ['upstream_ids', 'downstream_ids']);
+      const screenshots = collectUiImagePathsForReq(project_root, related_req_id);
+      const payload = { related_req_id, ...data };
+      if (screenshots.length > 0) {
+        payload.screenshots = screenshots;
+      }
+      registerInterfaceItem(project_root, 'ui_interface.yaml', id, payload, ['upstream_ids', 'downstream_ids']);
       
       // 2. 回写到 phase_one_progress.yaml
       if (related_req_id) {

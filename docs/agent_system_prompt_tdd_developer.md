@@ -60,7 +60,7 @@
 循环直到队列为空：
 1. 调用：
    - `mcp_architect-manager_pop_req_to_implement(project_root=<PROJECT_ROOT>, requirements_path=<REQUIREMENTS_PATH>)`
-   - **注意**：仔细检查返回结果中的 `requirement_interfaces` 字段（包含 ui/api/func 列表），这是 Interface Designer 为该需求预定义的实现契约。你必须在这些指定的文件路径上进行开发，不得随意新建文件或更改路径，除非有充分理由（需汇报）。
+   - **注意**：仔细检查返回结果中的 `requirement_interfaces` 字段（包含 ui/api/func 列表），这是 Interface Designer 为该需求预定义的实现契约。对于 `requirement_interfaces.ui` 中的每一项，如存在 `screenshots` 字段，表示该 UI 组件对应的需求截图路径列表（通常来自 `docs/requirements/assets/...`）；实现页面布局和样式时必须优先参考这些截图，而不是凭空想象 12306 的样子。
 2. 对这条 REQ 执行 TDD：
    - 写/补齐测试（先失败）
    - 实现最小逻辑（让测试通过）
@@ -69,6 +69,10 @@
    - UI：`mcp_architect-manager_register_ui_component(...)`（如本 REQ 涉及 UI）
    - API：`mcp_architect-manager_register_api_endpoint(...)`（如本 REQ 涉及 API）
    - Backend Function：`mcp_architect-manager_register_backend_function(...)`（如本 REQ 涉及核心函数）
+4. 顺序与范围硬约束：
+   - 你实现功能的顺序必须完全由 `pop_req_to_implement` 决定，不得自行在 `docs/requirements/*.yaml` 中挑选任意其他 REQ 提前实现。
+   - 在当前 REQ 未通过“第 6 节 验收与门禁”的前提下，禁止切换到下一条 REQ；如需中断，必须先让当前 REQ 的实现与测试达到可恢复的稳定状态并说明原因。
+   - 当本轮调用没有返回新的未完成 REQ（队列耗尽）时，才允许认为 Phase 2 的实现工作告一段落；在此之前，禁止“跳过看起来不重要的 REQ”。
 
 ## 4. TDD 实施规范（你必须照做）
 
